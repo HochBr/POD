@@ -4,372 +4,468 @@
  * @author: Leonardo de Oliveira Klitzke (2311100019)
  * @brief: Codificação e decodificação de Huffman
 */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+// Struct para a árvore de Huffman
 typedef struct huff {
-  unsigned char ctr;
-  int freq;
-  struct huff *esquerda;
-  struct huff *direita;
-  struct huff *next;
+    unsigned char ctr;
+    int freq;
+    struct huff *esquerda;
+    struct huff *direita;
+    struct huff *next;
 } Huff;
 
-// Funções Utilizadas.
+// Function declarations
 void Cria_Lista(Huff **head, unsigned char data);
-void Compara_Freq(Huff **head);
+void Frequencia(Huff **head);
+void Compara_Freq(Huff *head);
+void Compara_Caractere(Huff *head);
 void Libera_Lista(Huff *head);
 Huff *Remove_Lista(Huff **head);
 int Len(Huff *Head);
+Huff *Remove_Lista(Huff **head);
 void Inserir_Ordenado(Huff **head, Huff *novo);
 Huff *Montar_Arvore(Huff *head);
+void Imprime_Arvore(Huff *raiz, int tamanho);
 int Altura_Arvore(Huff *raiz);
 char **Aloca_Dicionario(int colunas);
 void Gerar_Dicionario(Huff *raiz, char **dicionario, char *caminho, int colunas);
-char *Codificar_Texto(char *filename, char **dicionario);
-char *Ler_Arquivo_Codificado(const char *filename);
-char *Decodificar(const char *texto_codificado, Huff *raiz);
+void Imprime_Dicionario(char **dicionario);
+char* Escrever_Arquivo(char **dicionario, Huff *texto);
 void escreve(FILE *fp, const char *texto);
+char* Codificar_Texto(char *texto, char **dicionario);
+char* Ler_Arquivo_Codificado(const char *filename);
+char* Decodificar(const char *texto_codificado, Huff *raiz);
 
-//---------------------------------------------------- MAIN
-//--------------------------------------------------------//
+//---------------------------------------------------- MAIN --------------------------------------------------------//
 
 int main(void) {
-  Huff *Primeiro = NULL;
-  FILE *fp = fopen("amostra.txt", "r");
-  if (fp == NULL) {
-    return 1;
-  } else {
-    int c;
-    while ((c = fgetc(fp)) != EOF) {
-      if (c != '\n') {
-        Cria_Lista(&Primeiro, (unsigned char)c);
-      }
-    }
-    fclose(fp);
-
-    Compara_Freq(&Primeiro);
-
-    Huff *ArvoreHuffman = Montar_Arvore(Primeiro);
-    int colunas = Altura_Arvore(ArvoreHuffman) + 1;
-
-    char **dicionario = Aloca_Dicionario(colunas);
-    Gerar_Dicionario(ArvoreHuffman, dicionario, "", colunas);
-
-    // Codificação do texto
-    char *codificado = Codificar_Texto("amostra.txt", dicionario);
-    FILE *arq = fopen("codificado.txt", "w");
-    if (arq != NULL) {
-      escreve(arq, codificado);
-      fclose(arq);
-    }
-    free(codificado);
-
-    // Decodificação do texto
-    char *texto_codificado = Ler_Arquivo_Codificado("codificado.txt");
-    char *decodificado = Decodificar(texto_codificado, ArvoreHuffman);
-    FILE *arq2 = fopen("decodificado.txt", "w");
-    if (arq2 != NULL) {
-      escreve(arq2, decodificado);
-      fclose(arq2);
-    }
-    free(texto_codificado);
-    free(decodificado);
-
-    // Libera a memória da lista e das strings
-    Libera_Lista(Primeiro);
-
-    // Libera a memória do dicionário
-    for (int i = 0; i < 256; i++) {
-      free(dicionario[i]);
-    }
-    free(dicionario);
-  }
-  return 0;
-}
-
-// Função para criar e adicionar os caracteres na lista de Huffman.
-void Cria_Lista(Huff **head,unsigned char dado) // Utilza como base a função utilizada nos código anteriores.
-{
-  Huff *temp = *head;
-  while (temp != NULL) {
-    if (temp->ctr ==
-        dado) // Caso seja o mesmo caracter, apenas incrementa a frequência.
-    {
-      temp->freq++;
-      return;
-    }
-    temp = temp->next;
-  }
-
-  Huff *NovoNo =
-      (Huff *)calloc(1, sizeof(Huff)); // Aloca memória para o novo nó.
-  if (!NovoNo) {
-    exit(1);
-  }
-  NovoNo->ctr = dado;
-  NovoNo->freq = 1;
-  NovoNo->next = NULL;
-
-  if (*head == NULL) {
-    *head = NovoNo;
-  } else {
-    temp = *head;
-    while (temp->next != NULL) {
-      temp = temp->next;
-    }
-    temp->next = NovoNo;
-  }
-}
-
-// Função para comparar as frequências e ordenar a lista.
-void Compara_Freq(Huff **head) {
-  Huff *sorted = NULL;
-  Huff *current = *head;
-  while (current != NULL) {
-    Huff *next = current->next;
-    Inserir_Ordenado(&sorted, current);
-    current = next;
-  }
-  *head = sorted;
-}
-
-// Função para liberar a memória da lista encadeada.
-void Libera_Lista(Huff *head) {
-  Huff *temp;
-  while (head != NULL) {
-    temp = head;
-    head = head->next;
-    free(temp);
-  }
-}
-
-int Len(Huff *Head) // Função para contar o número de nós na lista encadeada.
-{
-  if (Head == NULL) {
-    return 0;
-  }
-  int count = 0;
-  Huff *Aux = Head;
-  while (Aux != NULL) {
-    count++;
-    Aux = Aux->next;
-  }
-  return count;
-}
-
-Huff *Remove_Lista(Huff **head) // Função para remover um nó da lista encadeada.
-{
-  Huff *aux = NULL;
-  if (*head != NULL) {
-    aux = *head;
-    *head = aux->next;
-    aux->next = NULL;
-  }
-  return aux;
-}
-
-void Inserir_Ordenado(
-    Huff **head,
-    Huff *novo) // Função para inserir um nó na lista encadeada ordenada.
-{
-  if (*head == NULL || (*head)->freq >= novo->freq) // Caso a lista esteja vazia ou a frequência do novo nó seja menor ou igual
-  {
-    novo->next = *head;
-    *head = novo;
-  } else // Caso contrário, percorre a lista até encontrar a posição correta para inserir o nó.
-  {
-    Huff *current = *head;
-    while (current->next != NULL && current->next->freq < novo->freq) // Enquanto o próximo nó tiver uma frequência menor que o novo nó
-    {
-      current = current->next;
-    }
-    novo->next = current->next;
-    current->next = novo;
-  }
-}
-
-Huff *Montar_Arvore(Huff *head) // Função para montar a árvore de Huffman a partir da lista encadeada.
-{
-  Huff *Primeiro = NULL, *Segundo = NULL;
-  Huff *Aux = NULL, *ListaHuff = NULL;
-
-  while (head != NULL) // Enquanto a lista não estiver vazia
-  {
-    Huff *novo =(Huff *)calloc(1, sizeof(Huff)); // Aloca memória para o novo nó.
-    if (!novo) {
-      exit(1);
-    }
-    novo->ctr = head->ctr;   // Copia o caractere do nó atual para o novo nó.
-    novo->freq = head->freq; // Copia a frequência do nó atual para o novo nó.
-    novo->esquerda =NULL; // Inicializa os ponteiros esquerda e direita como NULL.
-    novo->direita =NULL;          // Inicializa os ponteiros esquerda e direita como NULL.
-    novo->next = NULL; // Inicializa o ponteiro next como NULL.
-    Inserir_Ordenado(&ListaHuff,novo); // Insere o novo nó na Árvore de Huffman.
-    head = head->next;      // Move para o próximo nó na lista.
-  }
-
-  while (Len(ListaHuff) > 1) // Enquanto a lista de nós não estiver vazia
-  {
-    Primeiro = Remove_Lista(&ListaHuff);   // Remove o primeiro nó da lista.
-    Segundo = Remove_Lista(&ListaHuff);    // Remove o segundo nó da lista.
-    Aux = (Huff *)calloc(1, sizeof(Huff)); // Aloca memória para o novo nó.
-    if (Aux == NULL) {
-      exit(1);
-    }
-    Aux->ctr = '+';
-    Aux->freq = Primeiro->freq + Segundo->freq; // Calcula a frequência do novo nó como a soma das frequências dos dois nós remo
-    Aux->esquerda = Primeiro;  // Define o ponteiro esquerda do novo nó como o primeiro nó removido.
-    Aux->direita = Segundo;    // Define o ponteiro direita do novo nó como o segundo nó removido.
-    Aux->next = NULL;          // Inicializa o ponteiro next como NULL.
-    Inserir_Ordenado(&ListaHuff, Aux); // Insere o novo nó na lista.
-  }
-  return ListaHuff;
-}
-
-int Altura_Arvore(Huff *raiz) // Percorre a árvore de Huffman e retorna a altura da árvore.
-{
-  if (raiz == NULL) {
-    return -1;
-  } else {
-    int esquerda = Altura_Arvore(raiz->esquerda) +1; // Percorre a subárvore esquerda recursivamente.
-    int direita = Altura_Arvore(raiz->direita) +1; // Percorre a subárvore direita recursivamente.
-    return (esquerda > direita) ? esquerda: direita; // Retorna a altura máxima entre as subárvores esquerda e direita.
-  }
-}
-
-char **
-Aloca_Dicionario(int colunas) // Aloca memória para o dicionário de caracteres.
-{
-  char **dicionario = (char **)malloc(sizeof(char *) * 256); // Aloca memória para o dicionário.
-  for (int i = 0; i < 256; i++) {
-    dicionario[i] = calloc(colunas, sizeof(char)); // Aloca memória para cada string do dicionário.
-  }
-  return dicionario;
-}
-
-void Gerar_Dicionario(Huff *raiz, char **dicionario, char *caminho,int colunas) // Função para gerar o dicionário de caracteres.
-{
-  char esq[colunas], dir[colunas];
-  if (raiz->esquerda == NULL && raiz->direita == NULL) // Verifica se o nó é uma folha.
-  {
-    strcpy(dicionario[raiz->ctr],caminho); // Copia o caminho atual para o dicionário.
-  } else             
-  {
-    strcpy(esq, caminho); // Copia o caminho atual para a string esq.
-    strcpy(dir, caminho); // Copia o caminho atual para a string dir.
-    strcat(esq, "0");     // Concatena "0" ao caminho esq.
-    strcat(dir, "1");     // Concatena "1" ao caminho dir.
-
-    Gerar_Dicionario(raiz->esquerda, dicionario, esq,colunas); // Gera o dicionário recursivamente para a subárvore esquerda.
-    Gerar_Dicionario(raiz->direita, dicionario, dir,colunas); // Gera o dicionário recursivamente para a subárvore direita.
-  }
-}
-
-int tamanho_Str(char **dicionario,char *texto) // Função para calcular o tamanho do texto codificado.
-{
-  int i = 0, tamanho = 0;
-  while (texto[i] != '\0') {
-    tamanho += strlen(dicionario[texto[i]]); // Calcula o tamanho da string correspondente ao caractere no dicionário.
-    i++;
-  }
-  return tamanho;
-}
-
-char *Codificar_Texto(char *arquivo,char **dicionario) // Função para codificar o texto.
-{
-  FILE *fp = fopen(arquivo, "r"); 
-  if (fp == NULL) {
-    return NULL;
-  }
-
-  fseek(fp, 0, SEEK_END);   // Move o ponteiro do arquivo para o final.
-  long tamanho = ftell(fp); // Obtém o tamanho do arquivo.
-  rewind(fp);               // Move o ponteiro do arquivo para o início.
-
-  char *texto = (char *)calloc(tamanho + 1, sizeof(char)); // Aloca memória para o texto codificado.
-  if (!texto) // Verifica se a alocação de memória foi bem-sucedida.
-  {
-    fclose(fp);
-    return NULL;
-  }
-
-  fread(texto, sizeof(char), tamanho,fp);  // Lê o conteúdo do arquivo.
-  texto[tamanho] = '\0'; // Adiciona o caractere nulo no final da string.
-  fclose(fp);            // Fecha o arquivo.
-
-  int tam = tamanho_Str(dicionario, texto); // Calcula o tamanho do texto codificado.
-  char *codigo = (char *)calloc(tam + 1, sizeof(char)); // Aloca memória para o texto codificado.
-  if (!codigo) {
-    free(texto);
-    return NULL;
-  }
-
-  for (int i = 0; texto[i] != '\0'; i++) // Percorre o texto codificado.
-  {
-    strcat(codigo, dicionario[texto[i]]); // Concatena o código correspondente ao caractere no texto codificado.
-  }
-
-  free(texto);
-  return codigo;
-}
-
-char *Ler_Arquivo_Codificado(
-const char *arquivo) // Função para ler o arquivo codificado.
-{
-  FILE *fp = fopen(arquivo, "r");
-  if (fp == NULL) {
-    return NULL;
-  }
-
-  fseek(fp, 0, SEEK_END);   // Move o ponteiro do arquivo para o final.
-  long tamanho = ftell(fp); // Obtém o tamanho do arquivo.
-  rewind(fp); // A função rewind() é usada para reposicionar o ponteiro do arquivo no início do arquivo.
-  char *texto = (char *)calloc(tamanho + 1, sizeof(char));
-  if (!texto) {
-    fclose(fp);
-    return NULL;
-  }
-
-  fread(texto, sizeof(char), tamanho, fp);
-  texto[tamanho] = '\0';
-  fclose(fp);
-
-  return texto;
-}
-
-char *Decodificar(const char *texto_codificado,Huff *raiz) // Função para decodificar o texto codificado.
-{
-  Huff *atual = raiz;
-  int len = strlen(texto_codificado); // Obtém o tamanho do texto codificado.
-  char *decodificado = (char *)calloc(len + 1, sizeof(char)); // Aloca memória para o texto decodificado.
-  if (!decodificado) {
-    return NULL;
-  }
-  int j = 0;
-
-  for (int i = 0; i < len; i++) // Percorre o texto codificado.
-  {
-    if (texto_codificado[i] =='0') // Se o caractere for '0', vai para a esquerda, caso contrário, vai para a direita.
-    {
-      atual = atual->esquerda;
+    Huff *Primeiro = NULL;
+    FILE *fp = fopen("amostra.txt", "rb"); // Abre o arquivo em modo binário
+    if (fp == NULL) {
+        printf("Erro ao abrir o arquivo.\n");
+        return 1;
     } else {
-      atual = atual->direita;
+        printf("Arquivo aberto com sucesso!\n");
+        int c;
+        while ((c = fgetc(fp)) != EOF) {
+            if (c != '\n') {
+                Cria_Lista(&Primeiro, (unsigned char)c);
+            }
+        }
+        fclose(fp); // Fecha o arquivo de leitura
+        Frequencia(&Primeiro);
+        Compara_Freq(Primeiro);      // Descomente para ordenar por frequência
+        Compara_Caractere(Primeiro); // Ordenar por caractere
+
+        Huff *ArvoreHuffman = Montar_Arvore(Primeiro);
+        printf("Huffman montado com sucesso!\n");
+        Imprime_Arvore(ArvoreHuffman, 1);
+        int colunas = Altura_Arvore(ArvoreHuffman) + 1;
+        printf("Tamanho: %d\n", colunas);
+
+        char **dicionario = Aloca_Dicionario(colunas);
+        Gerar_Dicionario(ArvoreHuffman, dicionario, "", colunas);
+        Imprime_Dicionario(dicionario);
+
+        printf("Altura da arvore: %d\n", Altura_Arvore(ArvoreHuffman));
+
+        // Codificação do texto
+        char *codificado = Codificar_Texto("amostra.txt", dicionario);
+        FILE *arq = fopen("codificado.txt", "w");
+        if (arq == NULL) {
+            printf("Erro ao abrir o arquivo.\n");
+        } else {
+            printf("Arquivo aberto com sucesso!\n");
+            escreve(arq, codificado);
+            fclose(arq);
+        }
+        free(codificado);
+
+        // Decodificação do texto
+        char *texto_codificado = Ler_Arquivo_Codificado("codificado.txt");
+        
+        char *decodificado = Decodificar(texto_codificado, ArvoreHuffman);
+        printf("Texto Decodificado: %s\n", decodificado);
+        FILE *arq2 = fopen("decodificado.txt", "w");
+        if (arq == NULL) {
+            printf("Erro ao abrir o arquivo.\n");
+        } else {
+            printf("Arquivo aberto com sucesso!\n");
+            escreve(arq, decodificado);
+            fclose(arq);
+        }
+        free(codificado);
+        // Libera a memória da lista e das strings
+        Libera_Lista(Primeiro);
+        free(texto_codificado);
+        free(decodificado);
+
+        // Libera a memória do dicionário
+        for (int i = 0; i < 256; i++) {
+            free(dicionario[i]);
+        }
+        free(dicionario);
+    }
+    return 0;
+}
+
+// Função para criar e adicionar os caracteres na lista de Huffman
+void Cria_Lista(Huff **head, unsigned char data) {
+    Huff *temp = *head;
+    while (temp != NULL) {
+        if (temp->ctr == data) {
+            temp->freq++;
+            return;
+        }
+        temp = temp->next;
     }
 
-    if (atual->esquerda == NULL && atual->direita ==NULL) // Se o nó atual for uma folha, adiciona o caractere correspondente ao texto decodificado.
-    {
-      decodificado[j++] = atual->ctr; // Adiciona o caractere ao texto decodificado.
-      atual = raiz;   // Volta para a raiz para continuar a decodificação.
+    Huff *newNode = (Huff *)calloc(1, sizeof(Huff));
+    if (!newNode) {
+        printf("Erro na função Cria_Lista ou erro de alocação\n");
+        exit(1);
     }
-  }
+    newNode->ctr = data;
+    newNode->freq = 1;
+    newNode->next = NULL;
 
-  decodificado[j] ='\0'; // Adiciona o caractere nulo ao final do texto decodificado.
-  return decodificado; // Retorna o texto decodificado.
+    if (*head == NULL) {
+        *head = newNode;
+    } else {
+        temp = *head;
+        while (temp->next != NULL) {
+            temp = temp->next;
+        }
+        temp->next = newNode;
+    }
+}
+
+// Função para processar a lista e consolidar as frequências dos caracteres
+void Frequencia(Huff **head) {
+    printf("Chegou na função Frequencia\n");
+    Huff *atual = *head;
+    while (atual != NULL) {
+        Huff *percorre = atual;
+        while (percorre->next != NULL) {
+            if (percorre->next->ctr == atual->ctr) {
+                atual->freq += percorre->next->freq;
+                Huff *temp = percorre->next;
+                percorre->next = percorre->next->next;
+                free(temp);
+            } else {
+                percorre = percorre->next;
+            }
+        }
+        atual = atual->next;
+    }
+}
+
+// Função para comparar as frequências e ordenar a lista
+void Compara_Freq(Huff *head) {
+    printf("Comparando frequências...\n");
+    if (head == NULL)
+        return;
+
+    Huff *atual = head;
+    while (atual != NULL) {
+        Huff *minNode = atual;
+        Huff *nextNode = atual->next;
+
+        while (nextNode != NULL) {
+            if (nextNode->freq < minNode->freq) {
+                minNode = nextNode;
+            }
+            nextNode = nextNode->next;
+        }
+
+        if (minNode != atual) {
+            int tempFreq = atual->freq;
+            unsigned char tempCtr = atual->ctr;
+            atual->freq = minNode->freq;
+            atual->ctr = minNode->ctr;
+            minNode->freq = tempFreq;
+            minNode->ctr = tempCtr;
+        }
+
+        atual = atual->next;
+    }
+}
+
+// Função para comparar os caracteres e ordenar a lista
+void Compara_Caractere(Huff *head) {
+    printf("Comparando caracteres...\n");
+    if (head == NULL)
+        return;
+
+    Huff *atual = head;
+    while (atual != NULL) {
+        Huff *minNode = atual;
+        Huff *nextNode = atual->next;
+
+        while (nextNode != NULL) {
+            if (nextNode->freq == atual->freq && nextNode->ctr < minNode->ctr) {
+                minNode = nextNode;
+            }
+            nextNode = nextNode->next;
+        }
+
+        if (minNode != atual) {
+            unsigned char tempCtr = atual->ctr;
+            int tempFreq = atual->freq;
+            atual->ctr = minNode->ctr;
+            atual->freq = minNode->freq;
+            minNode->ctr = tempCtr;
+            minNode->freq = tempFreq;
+        }
+
+        atual = atual->next;
+    }
+}
+
+// Função para liberar a memória da lista encadeada
+void Libera_Lista(Huff *head) {
+    printf("Liberando memória...\n");
+    Huff *temp;
+    while (head != NULL) {
+        temp = head;
+        head = head->next;
+        free(temp);
+    }
+}
+
+int Len(Huff *Head) {
+    if (Head == NULL) {
+        return 0;
+    }
+    int count = 0;
+    Huff *Aux = Head;
+    while (Aux != NULL) {
+        count++;
+        Aux = Aux->next;
+    }
+    return count;
+}
+
+Huff *Remove_Lista(Huff **head) {
+    Huff *aux = NULL;
+    if (*head != NULL) {
+        aux = *head;
+        *head = aux->next;
+        aux->next = NULL;
+    }
+    return aux;
+}
+
+// Inserir um nó Huff na lista de forma ordenada por frequência
+void Inserir_Ordenado(Huff **head, Huff *novo) {
+    if (*head == NULL || (*head)->freq >= novo->freq) {
+        novo->next = *head;
+        *head = novo;
+    } else {
+        Huff *current = *head;
+        while (current->next != NULL && current->next->freq < novo->freq) {
+            current = current->next;
+        }
+        novo->next = current->next;
+        current->next = novo;
+    }
+}
+
+Huff *Montar_Arvore(Huff *head) {
+    printf("Montando a arvore de Huffman\n");
+    Huff *Primeiro = NULL, *Segundo = NULL;
+    Huff *Aux = NULL, *ListaHuff = NULL;
+
+    while (head != NULL) {
+        Huff *novo = (Huff *)malloc(sizeof(Huff));
+        if (!novo) {
+            printf("Erro ao alocar memória\n");
+            exit(1);
+        }
+        novo->ctr = head->ctr;
+        novo->freq = head->freq;
+        novo->esquerda = NULL;
+        novo->direita = NULL;
+        novo->next = NULL;
+        Inserir_Ordenado(&ListaHuff, novo);
+        head = head->next;
+    }
+
+    while (Len(ListaHuff) > 1) {
+        Primeiro = Remove_Lista(&ListaHuff);
+        Segundo = Remove_Lista(&ListaHuff);
+        Aux = (Huff *)malloc(sizeof(Huff));
+        if (Aux == NULL) {
+            printf("Erro ao alocar memória\n");
+            exit(1);
+        }
+        Aux->ctr = '+';
+        Aux->freq = Primeiro->freq + Segundo->freq;
+        Aux->esquerda = Primeiro;
+        Aux->direita = Segundo;
+        Aux->next = NULL;
+        Inserir_Ordenado(&ListaHuff, Aux);
+    }
+    return ListaHuff;
+}
+
+void Imprime_Arvore(Huff *raiz, int tamanho) {
+    if (raiz->esquerda == NULL && raiz->direita == NULL) {
+        printf("Folha: %c, Tamanho: %d\n", raiz->ctr, tamanho);
+    } else {
+        Imprime_Arvore(raiz->esquerda, tamanho + 1);
+        Imprime_Arvore(raiz->direita, tamanho + 1);
+    }
+}
+
+int Altura_Arvore(Huff *raiz) {
+    if (raiz == NULL) {
+        return -1;
+    } else {
+        int esquerda = Altura_Arvore(raiz->esquerda) + 1;
+        int direita = Altura_Arvore(raiz->direita) + 1;
+        return (esquerda > direita) ? esquerda : direita;
+    }
+}
+
+char **Aloca_Dicionario(int colunas) {
+    char **dicionario = (char **)malloc(sizeof(char *) * 256);
+    for (int i = 0; i < 256; i++) {
+        dicionario[i] = calloc(colunas, sizeof(char));
+    }
+    return dicionario;
+}
+
+void Gerar_Dicionario(Huff *raiz, char **dicionario, char *caminho, int colunas) {
+    char esq[colunas], dir[colunas];
+    if (raiz->esquerda == NULL && raiz->direita == NULL) {
+        strcpy(dicionario[raiz->ctr], caminho);
+    } else {
+        strcpy(esq, caminho);
+        strcpy(dir, caminho);
+        strcat(esq, "0");
+        strcat(dir, "1");
+
+        Gerar_Dicionario(raiz->esquerda, dicionario, esq, colunas);
+        Gerar_Dicionario(raiz->direita, dicionario, dir, colunas);
+    }
+}
+
+void Imprime_Dicionario(char **dicionario) {
+    printf("Imprimindo o dicionario\n");
+    for (int i = 0; i < 256; i++) {
+        if (strlen(dicionario[i]) > 0) {
+            printf("Caractere: %c, Código: %s\n", i, dicionario[i]);
+        }
+    }
+}
+
+int tamanho_Str(char **dicionario, char *texto) {
+    int i = 0, tamanho = 0;
+    while (texto[i] != '\0') {
+        tamanho += strlen(dicionario[texto[i]]);
+        i++;
+    }
+    return tamanho;
+}
+
+char* Codificar_Texto(char *filename, char **dicionario) {
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        printf("Erro ao abrir o arquivo para codificação.\n");
+        return NULL;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long tamanho = ftell(fp);
+    rewind(fp);
+
+    char *texto = (char *)malloc(tamanho + 1);
+    if (!texto) {
+        printf("Erro de alocação de memória.\n");
+        fclose(fp);
+        return NULL;
+    }
+
+    fread(texto, sizeof(char), tamanho, fp);
+    texto[tamanho] = '\0';
+    fclose(fp);
+
+    int tam = tamanho_Str(dicionario, texto);
+    char *codigo = (char *)calloc(tam + 1, sizeof(char)); // +1 para o caractere nulo final
+    if (!codigo) {
+        printf("Erro de alocação de memória.\n");
+        free(texto);
+        return NULL;
+    }
+
+    for (int i = 0; texto[i] != '\0'; i++) {
+        strcat(codigo, dicionario[texto[i]]);
+    }
+
+    free(texto);
+    return codigo;
+}
+
+char* Ler_Arquivo_Codificado(const char *filename) {
+    FILE *fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("Erro ao abrir o arquivo codificado.\n");
+        return NULL;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    long tamanho = ftell(fp);
+    rewind(fp);
+
+    char *texto = (char *)malloc(tamanho + 1);
+    if (!texto) {
+        printf("Erro de alocação de memória.\n");
+        fclose(fp);
+        return NULL;
+    }
+
+    fread(texto, sizeof(char), tamanho, fp);
+    texto[tamanho] = '\0';
+    fclose(fp);
+
+    return texto;
+}
+
+char* Decodificar(const char *texto_codificado, Huff *raiz) {
+    Huff *atual = raiz;
+    int len = strlen(texto_codificado);
+    char *decodificado = (char *)malloc(len + 1); // +1 para o caractere nulo final
+    if (!decodificado) {
+        printf("Erro de alocação de memória.\n");
+        return NULL;
+    }
+    int j = 0;
+
+    for (int i = 0; i < len; i++) {
+        if (texto_codificado[i] == '0') {
+            atual = atual->esquerda;
+        } else {
+            atual = atual->direita;
+        }
+
+        if (atual->esquerda == NULL && atual->direita == NULL) {
+            decodificado[j++] = atual->ctr;
+            atual = raiz;
+        }
+    }
+
+    decodificado[j] = '\0';
+    return decodificado;
 }
 
 void escreve(FILE *fp, const char *texto) {
-  fwrite(texto, sizeof(char), strlen(texto), fp);
+    size_t len = strlen(texto);
+    if (fwrite(texto, sizeof(char), len, fp) != len) {
+        fprintf(stderr, "Erro ao escrever no arquivo.\n");
+    }
 }
+
